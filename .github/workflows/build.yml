@@ -30,28 +30,28 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
     
-    - name: Fix Android gitignore for CI
+    - name: Check www directory
       run: |
-        cd android
-        # Remove lines that block cap sync in CI
-        sed -i '/^capacitor-cordova-android-plugins$/d' .gitignore
-        sed -i '/^app\/src\/main\/assets\/public$/d' .gitignore
-        sed -i '/^app\/src\/main\/assets\/capacitor.config.json$/d' .gitignore
-        sed -i '/^app\/src\/main\/assets\/capacitor.plugins.json$/d' .gitignore
-        sed -i '/^app\/src\/main\/res\/xml\/config.xml$/d' .gitignore
-        echo "Android .gitignore fixed"
+        ls -la www/ || echo "www directory not found"
+        cat www/index.html | head -20 || echo "index.html not found"
+    
+    - name: Add Android platform
+      run: npx cap add android || echo "Android platform already exists"
     
     - name: Sync Capacitor
-      run: npx cap sync android
+      run: |
+        cd "${GITHUB_WORKSPACE}"
+        npx cap sync android --verbose 2>&1
     
     - name: Build APK
       run: |
         cd android
         chmod +x gradlew
-        ./gradlew assembleDebug
+        ./gradlew assembleDebug --stacktrace
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: aula-m8-apk
         path: android/app/build/outputs/apk/debug/*.apk
