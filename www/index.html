@@ -1,0 +1,1888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src * 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval' 'unsafe-inline'; style-src * 'self' 'unsafe-inline'; media-src *; img-src * 'self' data: content:;">
+<title>AULA M8 耳机控制</title>
+<script src="https://unpkg.com/@capacitor/core@latest/dist/capacitor.js"></script>
+<script src="https://unpkg.com/@capacitor-community/bluetooth-le@latest/dist/plugin.js"></script>
+<style>
+/* ========== CSS Variables ========== */
+:root {
+  --primary: #007AFF;
+  --primary-light: #4DA3FF;
+  --primary-dark: #0055CC;
+  --bg: #F2F2F7;
+  --white: #FFFFFF;
+  --card: #FFFFFF;
+  --card-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --text-primary: #1C1C1E;
+  --text-secondary: #8E8E93;
+  --text-tertiary: #AEAEB2;
+  --border: #E5E5EA;
+  --danger: #FF3B30;
+  --success: #34C759;
+  --warning: #FF9500;
+  --tab-height: 56px;
+  --header-height: 56px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --transition: 0.3s ease;
+}
+
+/* ========== Reset & Base ========== */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ========== App Shell ========== */
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ========== Header ========== */
+.header {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--white);
+  border-bottom: 0.5px solid var(--border);
+  padding: 0 16px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.header-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.header-back {
+  position: absolute;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  font-size: 20px;
+  color: var(--primary);
+  cursor: pointer;
+  border-radius: 50%;
+}
+.header-back:active { background: rgba(0,122,255,0.1); }
+.header-icon {
+  position: absolute;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  font-size: 18px;
+  color: var(--primary);
+  cursor: pointer;
+  border-radius: 50%;
+}
+.header-icon:active { background: rgba(0,122,255,0.1); }
+
+/* ========== Pages Container ========== */
+.pages-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+.page {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  opacity: 0;
+  transform: translateX(30px);
+  pointer-events: none;
+  transition: opacity var(--transition), transform var(--transition);
+}
+.page.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.page.slide-left {
+  transform: translateX(-30px);
+}
+
+/* ========== Tab Bar ========== */
+.tab-bar {
+  height: var(--tab-height);
+  display: flex;
+  background: var(--white);
+  border-top: 0.5px solid var(--border);
+  flex-shrink: 0;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  gap: 2px;
+  transition: color var(--transition);
+  position: relative;
+}
+.tab-item.active { color: var(--primary); }
+.tab-item svg { width: 24px; height: 24px; }
+.tab-item .tab-label { font-weight: 500; }
+
+/* ========== Scan Page ========== */
+.scan-page { display: flex; flex-direction: column; align-items: center; padding-top: 60px; }
+.scan-logo {
+  width: 120px; height: 120px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: 28px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(0,122,255,0.3);
+}
+.scan-logo svg { width: 64px; height: 64px; fill: white; }
+.scan-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+.scan-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; text-align: center; }
+.btn-scan {
+  width: 200px; height: 48px;
+  border: none; border-radius: 24px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white; font-size: 16px; font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,122,255,0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-scan:active { transform: scale(0.96); box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
+.btn-scan:disabled { opacity: 0.5; transform: none; }
+.scan-status { margin-top: 16px; font-size: 13px; color: var(--text-secondary); }
+.device-list {
+  width: 100%; margin-top: 24px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.device-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+.device-item:active { transform: scale(0.98); background: #f0f0f5; }
+.device-icon {
+  width: 40px; height: 40px;
+  background: rgba(0,122,255,0.1);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.device-info { flex: 1; }
+.device-name { font-size: 15px; font-weight: 500; }
+.device-id { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.device-rssi { font-size: 12px; color: var(--text-tertiary); }
+
+/* ========== Cards ========== */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 12px;
+}
+.card-title {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ========== Home Page ========== */
+.home-header {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+.home-device-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+.home-battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.battery-icon { font-size: 18px; }
+.battery-bar {
+  width: 28px; height: 14px;
+  border: 2px solid var(--text-secondary);
+  border-radius: 3px;
+  position: relative;
+  display: inline-block;
+}
+.battery-bar::after {
+  content: '';
+  position: absolute;
+  right: -5px; top: 3px;
+  width: 3px; height: 6px;
+  background: var(--text-secondary);
+  border-radius: 0 1px 1px 0;
+}
+.battery-fill {
+  height: 100%;
+  background: var(--success);
+  border-radius: 1px;
+  transition: width 0.5s;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.status-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.status-card:active { transform: scale(0.97); }
+.status-card-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.status-card-icon.anc { background: rgba(0,122,255,0.1); }
+.status-card-icon.game { background: rgba(255,149,0,0.1); }
+.status-card-icon.surround { background: rgba(175,82,222,0.1); }
+.status-card-icon.eq { background: rgba(52,199,89,0.1); }
+.status-card-text { flex: 1; min-width: 0; }
+.status-card-label { font-size: 12px; color: var(--text-secondary); }
+.status-card-value { font-size: 14px; font-weight: 600; margin-top: 1px; }
+.status-card-toggle {
+  width: 44px; height: 26px;
+  border-radius: 13px;
+  border: none;
+  background: #E5E5EA;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.status-card-toggle.on { background: var(--success); }
+.status-card-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.3s;
+}
+.status-card-toggle.on::after { transform: translateX(18px); }
+
+/* Music Control */
+.music-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 0;
+}
+.music-btn {
+  width: 48px; height: 48px;
+  border: none; border-radius: 50%;
+  background: rgba(0,122,255,0.1);
+  color: var(--primary);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+}
+.music-btn:active { transform: scale(0.9); background: rgba(0,122,255,0.2); }
+.music-btn.play {
+  width: 56px; height: 56px;
+  background: var(--primary);
+  color: white;
+  font-size: 24px;
+}
+
+/* ========== EQ Page ========== */
+.eq-presets {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.eq-presets::-webkit-scrollbar { display: none; }
+.eq-preset-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.eq-preset-btn.active {
+  border-color: var(--primary);
+  background: rgba(0,122,255,0.08);
+  color: var(--primary);
+}
+.eq-preset-btn:active { transform: scale(0.95); }
+
+.eq-sliders-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 200px;
+  padding: 16px 8px;
+  gap: 4px;
+}
+.eq-slider-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  height: 100%;
+}
+.eq-slider-value {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  height: 16px;
+}
+.eq-slider-track {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.eq-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 160px;
+  height: 160px;
+  background: transparent;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+.eq-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+}
+.eq-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: -8px;
+  box-shadow: 0 2px 6px rgba(0,122,255,0.3);
+  cursor: pointer;
+}
+.eq-slider-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.eq-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.eq-quick-btn {
+  padding: 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.eq-quick-btn:active { transform: scale(0.96); background: #f5f5f5; }
+.btn-apply {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: transform 0.2s;
+}
+.btn-apply:active { transform: scale(0.98); }
+
+/* ========== ANC Page ========== */
+.anc-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.anc-mode-card {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: var(--card-shadow);
+}
+.anc-mode-card.active {
+  border-color: var(--primary);
+  background: rgba(0,122,255,0.05);
+}
+.anc-mode-card:active { transform: scale(0.96); }
+.anc-mode-icon { font-size: 32px; margin-bottom: 8px; }
+.anc-mode-label { font-size: 14px; font-weight: 600; }
+.anc-mode-desc { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+.slider-section { margin-top: 16px; }
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.slider-label { font-size: 14px; font-weight: 500; }
+.slider-value { font-size: 14px; color: var(--primary); font-weight: 600; }
+.range-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+  cursor: pointer;
+}
+
+/* ========== LED Page ========== */
+.led-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.led-toggle-label { font-size: 16px; font-weight: 500; }
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  padding: 8px 0;
+}
+.color-item {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.color-item.active { border-color: var(--text-primary); transform: scale(1.1); }
+.color-item:active { transform: scale(0.9); }
+
+.led-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.led-mode-btn {
+  padding: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+.led-mode-btn.active {
+  border-color: var(--primary);
+  background: rgba(0,122,255,0.08);
+  color: var(--primary);
+}
+.led-mode-btn:active { transform: scale(0.96); }
+
+/* ========== Settings Page ========== */
+.settings-group {
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 12px;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--border);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.settings-item:last-child { border-bottom: none; }
+.settings-item:active { background: #f5f5f5; }
+.settings-item-icon {
+  width: 32px; height: 32px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.settings-item-content { flex: 1; }
+.settings-item-label { font-size: 15px; }
+.settings-item-value { font-size: 13px; color: var(--text-secondary); margin-top: 1px; }
+.settings-item-arrow { color: var(--text-tertiary); font-size: 14px; }
+
+.settings-toggle {
+  width: 44px; height: 26px;
+  border-radius: 13px;
+  border: none;
+  background: #E5E5EA;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.settings-toggle.on { background: var(--success); }
+.settings-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.3s;
+}
+.settings-toggle.on::after { transform: translateX(18px); }
+
+.btn-disconnect {
+  width: 100%;
+  padding: 14px;
+  border: 2px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--danger);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+}
+.btn-disconnect:active { background: var(--danger); color: white; }
+
+/* ========== Toast ========== */
+.toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.3s;
+  pointer-events: none;
+  max-width: 300px;
+  text-align: center;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ========== Loading Spinner ========== */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ========== Connection Status Bar ========== */
+.conn-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(52,199,89,0.1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--success);
+}
+.conn-status.disconnected {
+  background: rgba(255,59,48,0.1);
+  color: var(--danger);
+}
+.conn-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ========== Scrollbar ========== */
+.page::-webkit-scrollbar { width: 0; }
+
+/* ========== Animations ========== */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.card { animation: fadeIn 0.4s ease; }
+.card:nth-child(2) { animation-delay: 0.05s; }
+.card:nth-child(3) { animation-delay: 0.1s; }
+.card:nth-child(4) { animation-delay: 0.15s; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Header -->
+  <header class="header" id="mainHeader">
+    <button class="header-back" id="headerBack" style="display:none" onclick="goBack()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <span class="header-title" id="headerTitle">AULA M8</span>
+    <button class="header-icon" id="headerRight" style="display:none" onclick="reconnect()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+    </button>
+  </header>
+
+  <!-- Pages Container -->
+  <div class="pages-container">
+
+    <!-- Scan Page -->
+    <div class="page active" id="pageScan">
+      <div class="scan-page">
+        <div class="scan-logo">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM7 5a1 1 0 00-1 1v6a6 6 0 0012 0V6a1 1 0 00-2 0v6a4 4 0 01-8 0V6a1 1 0 00-1-1zm-4 4a1 1 0 00-1 1v2a9 9 0 0018 0v-2a1 1 0 00-2 0v2a7 7 0 01-14 0v-2a1 1 0 00-1-1z"/></svg>
+        </div>
+        <div class="scan-title">AULA M8</div>
+        <div class="scan-subtitle">请开启蓝牙并靠近耳机<br>点击下方按钮开始扫描</div>
+        <button class="btn-scan" id="btnScan" onclick="startScan()">扫描设备</button>
+        <div class="scan-status" id="scanStatus"></div>
+        <div class="device-list" id="deviceList"></div>
+      </div>
+    </div>
+
+    <!-- Home Page -->
+    <div class="page" id="pageHome">
+      <div class="conn-status" id="connStatus">
+        <span class="conn-dot"></span>
+        <span id="connText">已连接</span>
+      </div>
+      <div class="home-header">
+        <div class="home-device-name" id="homeDeviceName">AULA M8</div>
+        <div class="home-battery">
+          <span class="battery-icon">
+            <span class="battery-bar"><span class="battery-fill" id="batteryFill" style="width:80%"></span></span>
+          </span>
+          <span id="batteryText">80%</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">设备状态</div>
+        <div class="status-grid">
+          <div class="status-card" onclick="toggleANC()">
+            <div class="status-card-icon anc">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <div class="status-card-text">
+              <div class="status-card-label">降噪</div>
+              <div class="status-card-value" id="homeAncStatus">关闭</div>
+            </div>
+          </div>
+          <div class="status-card" onclick="toggleGameMode()">
+            <div class="status-card-icon game">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="16" cy="10" r="1" fill="#FF9500"/><circle cx="18" cy="12" r="1" fill="#FF9500"/></svg>
+            </div>
+            <div class="status-card-text">
+              <div class="status-card-label">游戏模式</div>
+              <div class="status-card-value" id="homeGameStatus">关闭</div>
+            </div>
+          </div>
+          <div class="status-card" onclick="toggle3D()">
+            <div class="status-card-icon surround">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4m-9.5-3.5l2.8-2.8m13.4-13.4l2.8-2.8M1 12h4m14 0h4M3.5 4.5l2.8 2.8m13.4 13.4l2.8 2.8"/></svg>
+            </div>
+            <div class="status-card-text">
+              <div class="status-card-label">3D音效</div>
+              <div class="status-card-value" id="home3DStatus">关闭</div>
+            </div>
+          </div>
+          <div class="status-card" onclick="switchTab(1)">
+            <div class="status-card-icon eq">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="14"/><line x1="9" y1="20" x2="9" y2="8"/><line x1="14" y1="20" x2="14" y2="4"/><line x1="19" y1="20" x2="19" y2="10"/></svg>
+            </div>
+            <div class="status-card-text">
+              <div class="status-card-label">均衡器</div>
+              <div class="status-card-value" id="homeEqStatus">标准</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">音乐控制</div>
+        <div class="music-control">
+          <button class="music-btn" onclick="musicControl('prev')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          <button class="music-btn play" onclick="musicControl('toggle')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="music-btn" onclick="musicControl('next')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 18h2V6h-2zM6 18l8.5-6L6 6z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EQ Page -->
+    <div class="page" id="pageEQ">
+      <div class="card">
+        <div class="card-title">预设模式</div>
+        <div class="eq-presets" id="eqPresets">
+          <button class="eq-preset-btn active" data-eq="normal">标准</button>
+          <button class="eq-preset-btn" data-eq="rock">摇滚</button>
+          <button class="eq-preset-btn" data-eq="pop">流行</button>
+          <button class="eq-preset-btn" data-eq="jazz">爵士</button>
+          <button class="eq-preset-btn" data-eq="classic">古典</button>
+          <button class="eq-preset-btn" data-eq="country">乡村</button>
+          <button class="eq-preset-btn" data-eq="custom">自定义</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">均衡器</div>
+        <div class="eq-sliders-container" id="eqSliders">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">快速调节</div>
+        <div class="eq-quick-actions">
+          <button class="eq-quick-btn" onclick="eqQuickAction('reset')">重置</button>
+          <button class="eq-quick-btn" onclick="eqQuickAction('bass')">重低音</button>
+          <button class="eq-quick-btn" onclick="eqQuickAction('vocal')">人声增强</button>
+          <button class="eq-quick-btn" onclick="eqQuickAction('treble')">高音增强</button>
+        </div>
+        <button class="btn-apply" onclick="applyEQ()">应用设置</button>
+      </div>
+    </div>
+
+    <!-- ANC Page -->
+    <div class="page" id="pageANC">
+      <div class="card">
+        <div class="card-title">降噪模式</div>
+        <div class="anc-modes">
+          <div class="anc-mode-card active" data-mode="off" onclick="setANCMode('off')">
+            <div class="anc-mode-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="1.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+            </div>
+            <div class="anc-mode-label">关闭</div>
+            <div class="anc-mode-desc">普通模式</div>
+          </div>
+          <div class="anc-mode-card" data-mode="anc" onclick="setANCMode('anc')">
+            <div class="anc-mode-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
+            </div>
+            <div class="anc-mode-label">降噪</div>
+            <div class="anc-mode-desc">主动降噪</div>
+          </div>
+          <div class="anc-mode-card" data-mode="transparency" onclick="setANCMode('transparency')">
+            <div class="anc-mode-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="1.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><circle cx="16" cy="12" r="2"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
+            </div>
+            <div class="anc-mode-label">通透</div>
+            <div class="anc-mode-desc">环境音透传</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="ancLevelCard" style="display:none">
+        <div class="slider-section">
+          <div class="slider-header">
+            <span class="slider-label">降噪等级</span>
+            <span class="slider-value" id="ancLevelValue">5</span>
+          </div>
+          <input type="range" class="range-slider" id="ancLevelSlider" min="0" max="10" value="5" oninput="updateANCLevel(this.value)">
+        </div>
+      </div>
+
+      <div class="card" id="transparencyLevelCard" style="display:none">
+        <div class="slider-section">
+          <div class="slider-header">
+            <span class="slider-label">通透等级</span>
+            <span class="slider-value" id="transparencyLevelValue">5</span>
+          </div>
+          <input type="range" class="range-slider" id="transparencyLevelSlider" min="0" max="10" value="5" oninput="updateTransparencyLevel(this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- LED Page -->
+    <div class="page" id="pageLED">
+      <div class="card">
+        <div class="led-toggle-row">
+          <span class="led-toggle-label">灯光开关</span>
+          <button class="settings-toggle on" id="ledToggle" onclick="toggleLED()"></button>
+        </div>
+      </div>
+
+      <div class="card" id="ledColorCard">
+        <div class="card-title">灯光颜色</div>
+        <div class="color-grid" id="colorGrid">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+      <div class="card" id="ledModeCard">
+        <div class="card-title">灯光模式</div>
+        <div class="led-modes">
+          <button class="led-mode-btn active" data-ledmode="static" onclick="setLEDMode('static')">静态</button>
+          <button class="led-mode-btn" data-ledmode="cycle" onclick="setLEDMode('cycle')">循环渐变</button>
+          <button class="led-mode-btn" data-ledmode="bounce" onclick="setLEDMode('bounce')">往返渐变</button>
+          <button class="led-mode-btn" data-ledmode="multi" onclick="setLEDMode('multi')">多彩循环</button>
+        </div>
+      </div>
+
+      <div class="card" id="ledBrightnessCard">
+        <div class="slider-section">
+          <div class="slider-header">
+            <span class="slider-label">亮度</span>
+            <span class="slider-value" id="ledBrightnessValue">80%</span>
+          </div>
+          <input type="range" class="range-slider" id="ledBrightnessSlider" min="0" max="100" value="80" oninput="updateLEDBrightness(this.value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Page -->
+    <div class="page" id="pageSettings">
+      <div class="card">
+        <div class="card-title">设备信息</div>
+        <div class="settings-group" style="box-shadow:none;margin:0">
+          <div class="settings-item" style="cursor:default">
+            <div class="settings-item-icon" style="background:rgba(0,122,255,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">设备名称</div>
+              <div class="settings-item-value" id="settingDeviceName">AULA M8</div>
+            </div>
+          </div>
+          <div class="settings-item" style="cursor:default">
+            <div class="settings-item-icon" style="background:rgba(52,199,89,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">固件版本</div>
+              <div class="settings-item-value" id="settingFirmware">--</div>
+            </div>
+          </div>
+          <div class="settings-item" style="cursor:default">
+            <div class="settings-item-icon" style="background:rgba(255,149,0,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2"><rect x="1" y="6" width="18" height="12" rx="2"/><line x1="23" y1="13" x2="23" y2="11"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">电量</div>
+              <div class="settings-item-value" id="settingBattery">--%</div>
+            </div>
+          </div>
+          <div class="settings-item" style="cursor:default">
+            <div class="settings-item-icon" style="background:rgba(175,82,222,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2"><path d="M6.5 6.5l11 11"/><path d="M21 3l-6.5 6.5"/><path d="M3 21l6.5-6.5"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">蓝牙地址</div>
+              <div class="settings-item-value" id="settingBTAddr">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">功能设置</div>
+        <div class="settings-group" style="box-shadow:none;margin:0">
+          <div class="settings-item" onclick="toggleGameMode()">
+            <div class="settings-item-icon" style="background:rgba(255,149,0,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">游戏模式</div>
+            </div>
+            <button class="settings-toggle" id="settingGameToggle" onclick="event.stopPropagation();toggleGameMode()"></button>
+          </div>
+          <div class="settings-item" onclick="toggle3D()">
+            <div class="settings-item-icon" style="background:rgba(175,82,222,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">3D音效</div>
+            </div>
+            <button class="settings-toggle" id="setting3DToggle" onclick="event.stopPropagation();toggle3D()"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">其他</div>
+        <div class="settings-group" style="box-shadow:none;margin:0">
+          <div class="settings-item" onclick="findDevice()">
+            <div class="settings-item-icon" style="background:rgba(0,122,255,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">查找设备</div>
+              <div class="settings-item-value">让耳机发出提示音</div>
+            </div>
+            <span class="settings-item-arrow">&#8250;</span>
+          </div>
+          <div class="settings-item" onclick="checkUpdate()">
+            <div class="settings-item-icon" style="background:rgba(52,199,89,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">检查更新</div>
+              <div class="settings-item-value">当前已是最新版本</div>
+            </div>
+            <span class="settings-item-arrow">&#8250;</span>
+          </div>
+          <div class="settings-item" onclick="factoryReset()">
+            <div class="settings-item-icon" style="background:rgba(255,59,48,0.1)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+            </div>
+            <div class="settings-item-content">
+              <div class="settings-item-label">恢复出厂设置</div>
+              <div class="settings-item-value">清除所有自定义设置</div>
+            </div>
+            <span class="settings-item-arrow">&#8250;</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-disconnect" onclick="disconnectDevice()">断开连接</button>
+      <div style="height:20px"></div>
+    </div>
+
+  </div>
+
+  <!-- Tab Bar -->
+  <nav class="tab-bar" id="tabBar" style="display:none">
+    <button class="tab-item active" data-tab="0" onclick="switchTab(0)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="tab-label">首页</span>
+    </button>
+    <button class="tab-item" data-tab="1" onclick="switchTab(1)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="4" y2="14"/><line x1="9" y1="20" x2="9" y2="8"/><line x1="14" y1="20" x2="14" y2="4"/><line x1="19" y1="20" x2="19" y2="10"/></svg>
+      <span class="tab-label">音效</span>
+    </button>
+    <button class="tab-item" data-tab="2" onclick="switchTab(2)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span class="tab-label">降噪</span>
+    </button>
+    <button class="tab-item" data-tab="3" onclick="switchTab(3)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <span class="tab-label">灯光</span>
+    </button>
+    <button class="tab-item" data-tab="4" onclick="switchTab(4)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="tab-label">设置</span>
+    </button>
+  </nav>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ================================================================
+   AULA M8 Web BLE Controller
+   Based on CM2206 Chip Protocol
+   ================================================================ */
+
+// ========== Constants ==========
+const CMEDIA_SERVICE_UUID        = '0000ab23-0000-1000-8000-00805f9b34fb';
+const CONTROL_CHAR_UUID          = '0000ab24-0000-1000-8000-00805f9b34fb';
+const NOTIFY_CHAR_UUID           = '0000ab25-0000-1000-8000-00805f9b34fb';
+const BATTERY_SERVICE_UUID       = '0000180f-0000-1000-8000-00805f9b34fb';
+const BATTERY_LEVEL_UUID         = '00002a19-0000-1000-8000-00805f9b34fb';
+
+// CMD types
+const CMD_REQUEST  = 1;
+const CMD_RESPONSE = 2;
+const CMD_NOTIFY   = 3;
+
+// CMD IDs
+const CMD_EQ          = 0x20;
+const CMD_MUSIC       = 0x21;
+const CMD_MODE        = 0x25;
+const CMD_GET_INFO    = 0x27;
+const CMD_BT_NAME     = 0x2D;
+const CMD_LED         = 0x2E;
+const CMD_FIND_DEVICE = 0x2A;
+const CMD_ANC         = 0x2C;
+const CMD_ANC_LEVEL   = 0x30;
+const CMD_TRANS_LEVEL = 0x31;
+const CMD_3D_AUDIO    = 0x32;
+const CMD_LANGUAGE    = 0x29;
+
+// ========== State ==========
+const state = {
+  connected: false,
+  device: null,
+  server: null,
+  controlChar: null,
+  notifyChar: null,
+  batteryChar: null,
+  seqNum: 0,
+  currentTab: -1, // -1 = scan page
+  // Device state
+  battery: 80,
+  firmware: '--',
+  deviceName: 'AULA M8',
+  btAddress: '--',
+  // ANC
+  ancMode: 'off', // off, anc, transparency
+  ancLevel: 5,
+  transparencyLevel: 5,
+  // EQ
+  eqPreset: 'normal',
+  eqBands: [0,0,0,0,0,0,0,0,0,0], // 10 bands, -12 to +12
+  // Game mode
+  gameMode: false,
+  // 3D Audio
+  audio3D: false,
+  // LED
+  ledOn: true,
+  ledColor: '#FF0000',
+  ledMode: 'static',
+  ledBrightness: 80,
+  // Music
+  musicPlaying: false,
+};
+
+// EQ Band frequencies
+const EQ_BANDS = [
+  { freq: '30', label: '30' },
+  { freq: '60', label: '60' },
+  { freq: '120', label: '120' },
+  { freq: '250', label: '250' },
+  { freq: '500', label: '500' },
+  { freq: '1k', label: '1k' },
+  { freq: '2k', label: '2k' },
+  { freq: '4k', label: '4k' },
+  { freq: '8k', label: '8k' },
+  { freq: '16k', label: '16k' },
+];
+
+// EQ Presets
+const EQ_PRESETS = {
+  normal:  [0,0,0,0,0,0,0,0,0,0],
+  rock:    [5,4,3,1,-1,1,3,4,5,5],
+  pop:     [-1,2,4,5,4,2,0,-1,-1,0],
+  jazz:    [3,2,0,2,-1,-1,0,1,3,4],
+  classic: [4,3,2,1,-1,-1,0,1,3,5],
+  country: [-1,0,1,2,3,2,1,0,-1,-1],
+};
+
+// LED Colors
+const LED_COLORS = [
+  '#FF0000','#FF4400','#FF8800','#FFCC00','#FFFF00','#88FF00',
+  '#00FF00','#00FF88','#00FFFF','#0088FF','#0000FF','#8800FF',
+];
+
+// ========== Page References ==========
+const pages = ['pageHome','pageEQ','pageANC','pageLED','pageSettings'];
+const tabTitles = ['AULA M8','均衡器','降噪设置','灯光设置','设置'];
+
+// ========== Initialization ==========
+document.addEventListener('DOMContentLoaded', () => {
+  initEQSliders();
+  initColorGrid();
+  checkBluetoothSupport();
+});
+
+function checkBluetoothSupport() {
+  if (!navigator.bluetooth) {
+    document.getElementById('scanStatus').textContent = '当前浏览器不支持 Web Bluetooth API，请使用 Chrome 或 Edge 浏览器。';
+    document.getElementById('btnScan').disabled = true;
+  }
+}
+
+// ========== Toast ==========
+let toastTimer = null;
+function showToast(msg, duration = 2000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ========== Protocol Helpers ==========
+function buildPacket(cmd, cmdType, payload = []) {
+  const seq = state.seqNum & 0x0F;
+  state.seqNum++;
+  const payloadLen = payload.length;
+  const frameSeq = 0;
+  const frameTotal = 1;
+  const header = new Uint8Array([
+    (seq << 4) | 0x00, // seq(4) | reserve(3) | encrypt(0)
+    cmd,
+    cmdType,
+    (frameSeq << 4) | frameTotal,
+    payloadLen
+  ]);
+  const packet = new Uint8Array(5 + payloadLen);
+  packet.set(header, 0);
+  if (payload.length > 0) packet.set(payload, 5);
+  return packet;
+}
+
+async function sendCommand(cmd, payload = []) {
+  if (!state.controlChar) {
+    showToast('未连接设备');
+    return null;
+  }
+  try {
+    const packet = buildPacket(cmd, CMD_REQUEST, payload);
+    await state.controlChar.writeValue(packet);
+    console.log('[TX]', cmd.toString(16), payload);
+    return packet;
+  } catch (e) {
+    console.error('[TX Error]', e);
+    showToast('发送失败: ' + e.message);
+    return null;
+  }
+}
+
+function parseNotify(data) {
+  if (data.length < 5) return null;
+  const cmd = data[1];
+  const cmdType = data[2];
+  const payloadLen = data[4];
+  const payload = data.slice(5, 5 + payloadLen);
+  console.log('[RX]', '0x' + cmd.toString(16), cmdType, payload);
+  return { cmd, cmdType, payload };
+}
+
+function handleNotify(event) {
+  const data = new Uint8Array(event.target.value.buffer || event.target.value);
+  const msg = parseNotify(data);
+  if (!msg) return;
+
+  switch (msg.cmd) {
+    case CMD_ANC:
+      handleANCNotify(msg.payload);
+      break;
+    case CMD_ANC_LEVEL:
+      if (msg.payload.length > 0) {
+        state.ancLevel = msg.payload[0];
+        document.getElementById('ancLevelSlider').value = state.ancLevel;
+        document.getElementById('ancLevelValue').textContent = state.ancLevel;
+      }
+      break;
+    case CMD_TRANS_LEVEL:
+      if (msg.payload.length > 0) {
+        state.transparencyLevel = msg.payload[0];
+        document.getElementById('transparencyLevelSlider').value = state.transparencyLevel;
+        document.getElementById('transparencyLevelValue').textContent = state.transparencyLevel;
+      }
+      break;
+    case CMD_EQ:
+      handleEQNotify(msg.payload);
+      break;
+    case CMD_MODE:
+      handleModeNotify(msg.payload);
+      break;
+    case CMD_3D_AUDIO:
+      if (msg.payload.length > 0) {
+        state.audio3D = msg.payload[0] !== 0;
+        update3DUI();
+      }
+      break;
+    case CMD_GET_INFO:
+      handleDeviceInfo(msg.payload);
+      break;
+    case CMD_LED:
+      handleLEDNotify(msg.payload);
+      break;
+    case CMD_MUSIC:
+      handleMusicNotify(msg.payload);
+      break;
+  }
+}
+
+// ========== Notify Handlers ==========
+function handleANCNotify(payload) {
+  if (payload.length < 1) return;
+  const mode = payload[0];
+  if (mode === 0) {
+    state.ancMode = 'off';
+  } else if (mode === 1) {
+    state.ancMode = 'anc';
+  } else if (mode === 2) {
+    state.ancMode = 'transparency';
+  }
+  updateANCUUI();
+}
+
+function handleEQNotify(payload) {
+  if (payload.length < 1) return;
+  const preset = payload[0];
+  const presetNames = ['normal','rock','pop','jazz','classic','country'];
+  if (preset < presetNames.length) {
+    state.eqPreset = presetNames[preset];
+  }
+  // Parse 10 band values if available
+  if (payload.length >= 11) {
+    for (let i = 0; i < 10; i++) {
+      state.eqBands[i] = payload[i + 1] > 127 ? payload[i + 1] - 256 : payload[i + 1];
+    }
+  }
+  updateEQUI();
+}
+
+function handleModeNotify(payload) {
+  if (payload.length < 1) return;
+  state.gameMode = (payload[0] & 0x01) !== 0;
+  updateGameModeUI();
+}
+
+function handleDeviceInfo(payload) {
+  try {
+    const decoder = new TextDecoder('utf-8');
+    // Parse device info string
+    const infoStr = decoder.decode(payload);
+    console.log('[Device Info]', infoStr);
+    // Try to extract firmware version
+    if (payload.length >= 4) {
+      const fw = `v${payload[0]}.${payload[1]}.${payload[2]}`;
+      state.firmware = fw;
+      document.getElementById('settingFirmware').textContent = fw;
+    }
+  } catch (e) {
+    console.error('Parse device info error', e);
+  }
+}
+
+function handleLEDNotify(payload) {
+  if (payload.length < 1) return;
+  state.ledOn = (payload[0] & 0x01) !== 0;
+  updateLEDUI();
+}
+
+function handleMusicNotify(payload) {
+  if (payload.length < 1) return;
+  state.musicPlaying = (payload[0] & 0x01) !== 0;
+  updateMusicUI();
+}
+
+// ========== Bluetooth ==========
+async function startScan() {
+  if (!navigator.bluetooth) {
+    showToast('浏览器不支持蓝牙功能');
+    return;
+  }
+
+  const btn = document.getElementById('btnScan');
+  const statusEl = document.getElementById('scanStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  statusEl.textContent = '正在扫描...';
+
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { services: [CMEDIA_SERVICE_UUID] }
+      ],
+      optionalServices: [BATTERY_SERVICE_UUID]
+    });
+
+    statusEl.textContent = '正在连接 ' + device.name + '...';
+    await connectToDevice(device);
+  } catch (e) {
+    if (e.name === 'NotFoundError') {
+      statusEl.textContent = '未选择设备';
+    } else {
+      statusEl.textContent = '扫描失败: ' + e.message;
+      console.error(e);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '扫描设备';
+  }
+}
+
+async function connectToDevice(device) {
+  try {
+    state.device = device;
+    state.server = await device.gatt.connect();
+
+    // Get C-Media service
+    const cmService = await state.server.getPrimaryService(CMEDIA_SERVICE_UUID);
+    state.controlChar = await cmService.getCharacteristic(CONTROL_CHAR_UUID);
+    state.notifyChar = await cmService.getCharacteristic(NOTIFY_CHAR_UUID);
+
+    // Enable notifications
+    await state.notifyChar.startNotifications();
+    state.notifyChar.addEventListener('characteristicvaluechanged', handleNotify);
+
+    // Try to get battery service
+    try {
+      const batteryService = await state.server.getPrimaryService(BATTERY_SERVICE_UUID);
+      state.batteryChar = await batteryService.getCharacteristic(BATTERY_LEVEL_UUID);
+      const batteryValue = await state.batteryChar.readValue();
+      state.battery = batteryValue.getUint8(0);
+    } catch (e) {
+      console.log('Battery service not available');
+    }
+
+    state.connected = true;
+    state.deviceName = device.name || 'AULA M8';
+
+    // Listen for disconnect
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+
+    // Update UI
+    updateConnectionUI();
+    showToast('连接成功');
+
+    // Query device info
+    await sendCommand(CMD_GET_INFO);
+
+    // Switch to home page
+    switchTab(0);
+  } catch (e) {
+    console.error('Connection error', e);
+    showToast('连接失败: ' + e.message);
+    state.connected = false;
+    updateConnectionUI();
+  }
+}
+
+function onDisconnected() {
+  state.connected = false;
+  state.controlChar = null;
+  state.notifyChar = null;
+  state.batteryChar = null;
+  showToast('设备已断开连接');
+  updateConnectionUI();
+  // Go back to scan page
+  showScanPage();
+}
+
+async function disconnectDevice() {
+  if (state.device && state.device.gatt.connected) {
+    state.device.gatt.disconnect();
+  }
+  state.connected = false;
+  state.controlChar = null;
+  state.notifyChar = null;
+  state.batteryChar = null;
+  updateConnectionUI();
+  showScanPage();
+  showToast('已断开连接');
+}
+
+async function reconnect() {
+  if (!state.device) {
+    showToast('没有可重连的设备');
+    return;
+  }
+  showToast('正在重连...');
+  try {
+    await connectToDevice(state.device);
+  } catch (e) {
+    showToast('重连失败');
+  }
+}
+
+// ========== Navigation ==========
+function switchTab(index) {
+  if (index === state.currentTab) return;
+  const prevTab = state.currentTab;
+
+  // Hide all pages
+  pages.forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active', 'slide-left');
+  });
+
+  // Show target page
+  const targetPage = document.getElementById(pages[index]);
+  if (prevTab >= 0 && index < prevTab) {
+    targetPage.classList.add('slide-left');
+  }
+  // Small delay for animation
+  requestAnimationFrame(() => {
+    targetPage.classList.add('active');
+  });
+
+  // Update tab bar
+  document.querySelectorAll('.tab-item').forEach((item, i) => {
+    item.classList.toggle('active', i === index);
+  });
+
+  // Update header
+  document.getElementById('headerTitle').textContent = tabTitles[index];
+  document.getElementById('headerBack').style.display = 'none';
+  document.getElementById('headerRight').style.display = state.connected ? 'flex' : 'none';
+
+  state.currentTab = index;
+}
+
+function showScanPage() {
+  // Hide all tab pages
+  pages.forEach(id => {
+    document.getElementById(id).classList.remove('active', 'slide-left');
+  });
+
+  // Show scan page
+  document.getElementById('pageScan').classList.add('active');
+
+  // Hide tab bar
+  document.getElementById('tabBar').style.display = 'none';
+
+  // Update header
+  document.getElementById('headerTitle').textContent = 'AULA M8';
+  document.getElementById('headerBack').style.display = 'none';
+  document.getElementById('headerRight').style.display = 'none';
+
+  state.currentTab = -1;
+}
+
+function goBack() {
+  if (state.connected) {
+    switchTab(0);
+  }
+}
+
+function updateConnectionUI() {
+  const tabBar = document.getElementById('tabBar');
+  const connStatus = document.getElementById('connStatus');
+  const connText = document.getElementById('connText');
+
+  if (state.connected) {
+    tabBar.style.display = 'flex';
+    connStatus.classList.remove('disconnected');
+    connText.textContent = '已连接';
+    document.getElementById('headerRight').style.display = 'flex';
+    updateBatteryUI();
+    updateHomeDeviceName();
+  } else {
+    tabBar.style.display = 'none';
+    connStatus.classList.add('disconnected');
+    connText.textContent = '未连接';
+    document.getElementById('headerRight').style.display = 'none';
+  }
+}
+
+// ========== UI Updates ==========
+function updateBatteryUI() {
+  const pct = state.battery;
+  document.getElementById('batteryFill').style.width = pct + '%';
+  document.getElementById('batteryText').textContent = pct + '%';
+  document.getElementById('settingBattery').textContent = pct + '%';
+
+  // Color based on level
+  const fill = document.getElementById('batteryFill');
+  if (pct <= 20) fill.style.background = 'var(--danger)';
+  else if (pct <= 50) fill.style.background = 'var(--warning)';
+  else fill.style.background = 'var(--success)';
+}
+
+function updateHomeDeviceName() {
+  document.getElementById('homeDeviceName').textContent = state.deviceName;
+  document.getElementById('settingDeviceName').textContent = state.deviceName;
+}
+
+function updateANCUUI() {
+  const labels = { off: '关闭', anc: '降噪', transparency: '通透' };
+  document.getElementById('homeAncStatus').textContent = labels[state.ancMode];
+
+  // Update ANC page cards
+  document.querySelectorAll('.anc-mode-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.mode === state.ancMode);
+  });
+
+  // Show/hide level sliders
+  document.getElementById('ancLevelCard').style.display = state.ancMode === 'anc' ? 'block' : 'none';
+  document.getElementById('transparencyLevelCard').style.display = state.ancMode === 'transparency' ? 'block' : 'none';
+}
+
+function updateGameModeUI() {
+  document.getElementById('homeGameStatus').textContent = state.gameMode ? '开启' : '关闭';
+  const toggle = document.getElementById('settingGameToggle');
+  toggle.classList.toggle('on', state.gameMode);
+}
+
+function update3DUI() {
+  document.getElementById('home3DStatus').textContent = state.audio3D ? '开启' : '关闭';
+  const toggle = document.getElementById('setting3DToggle');
+  toggle.classList.toggle('on', state.audio3D);
+}
+
+function updateMusicUI() {
+  const icon = document.getElementById('playIcon');
+  if (state.musicPlaying) {
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  } else {
+    icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  }
+}
+
+function updateEQUI() {
+  // Update preset buttons
+  document.querySelectorAll('.eq-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.eq === state.eqPreset);
+  });
+  document.getElementById('homeEqStatus').textContent =
+    { normal:'标准', rock:'摇滚', pop:'流行', jazz:'爵士', classic:'古典', country:'乡村', custom:'自定义' }[state.eqPreset] || '标准';
+
+  // Update sliders
+  state.eqBands.forEach((val, i) => {
+    const slider = document.getElementById('eqSlider' + i);
+    const valueEl = document.getElementById('eqValue' + i);
+    if (slider) slider.value = val;
+    if (valueEl) valueEl.textContent = (val >= 0 ? '+' : '') + val;
+  });
+}
+
+function updateLEDUI() {
+  const toggle = document.getElementById('ledToggle');
+  toggle.classList.toggle('on', state.ledOn);
+
+  // Update color selection
+  document.querySelectorAll('.color-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.color === state.ledColor);
+  });
+
+  // Update mode buttons
+  document.querySelectorAll('.led-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.ledmode === state.ledMode);
+  });
+}
+
+// ========== Commands ==========
+async function toggleANC() {
+  if (!state.connected) return showToast('请先连接设备');
+  // Cycle: off -> anc -> transparency -> off
+  const modes = ['off', 'anc', 'transparency'];
+  const idx = (modes.indexOf(state.ancMode) + 1) % 3;
+  await setANCMode(modes[idx]);
+}
+
+async function setANCMode(mode) {
+  if (!state.connected) return showToast('请先连接设备');
+  state.ancMode = mode;
+  updateANCUUI();
+
+  const modeVal = mode === 'off' ? 0 : mode === 'anc' ? 1 : 2;
+  await sendCommand(CMD_ANC, [modeVal]);
+
+  // Also set level if applicable
+  if (mode === 'anc') {
+    await sendCommand(CMD_ANC_LEVEL, [state.ancLevel]);
+  } else if (mode === 'transparency') {
+    await sendCommand(CMD_TRANS_LEVEL, [state.transparencyLevel]);
+  }
+}
+
+async function updateANCLevel(val) {
+  state.ancLevel = parseInt(val);
+  document.getElementById('ancLevelValue').textContent = val;
+  if (state.connected && state.ancMode === 'anc') {
+    await sendCommand(CMD_ANC_LEVEL, [state.ancLevel]);
+  }
+}
+
+async function updateTransparencyLevel(val) {
+  state.transparencyLevel = parseInt(val);
+  document.getElementById('transparencyLevelValue').textContent = val;
+  if (state.connected && state.ancMode === 'transparency') {
+    await sendCommand(CMD_TRANS_LEVEL, [state.transparencyLevel]);
+  }
+}
+
+async function toggleGameMode() {
+  if (!state.connected) return showToast('请先连接设备');
+  state.gameMode = !state.gameMode;
+  updateGameModeUI();
+  await sendCommand(CMD_MODE, [state.gameMode ? 1 : 0]);
+}
+
+async function toggle3D() {
+  if (!state.connected) return showToast('请先连接设备');
+  state.audio3D = !state.audio3D;
+  update3DUI();
+  await sendCommand(CMD_3D_AUDIO, [state.audio3D ? 1 : 0]);
+}
+
+async function musicControl(action) {
+  if (!state.connected) return showToast('请先连接设备');
+  let cmd = 0;
+  switch (action) {
+    case 'prev': cmd = 1; break;
+    case 'next': cmd = 2; break;
+    case 'toggle': cmd = 3; state.musicPlaying = !state.musicPlaying; updateMusicUI(); break;
+  }
+  await sendCommand(CMD_MUSIC, [cmd]);
+}
+
+async function toggleLED() {
+  if (!state.connected) return showToast('请先连接设备');
+  state.ledOn = !state.ledOn;
+  updateLEDUI();
+  // LED command: [on_off, mode, r, g, b, brightness]
+  const rgb = hexToRgb(state.ledColor);
+  const modeVal = { static:0, cycle:1, bounce:2, multi:3 }[state.ledMode] || 0;
+  await sendCommand(CMD_LED, [
+    state.ledOn ? 1 : 0,
+    modeVal,
+    rgb.r, rgb.g, rgb.b,
+    Math.round(state.ledBrightness * 2.55)
+  ]);
+}
+
+async function setLEDMode(mode) {
+  if (!state.connected) return showToast('请先连接设备');
+  state.ledMode = mode;
+  updateLEDUI();
+  const rgb = hexToRgb(state.ledColor);
+  const modeVal = { static:0, cycle:1, bounce:2, multi:3 }[mode] || 0;
+  await sendCommand(CMD_LED, [
+    state.ledOn ? 1 : 0,
+    modeVal,
+    rgb.r, rgb.g, rgb.b,
+    Math.round(state.ledBrightness * 2.55)
+  ]);
+}
+
+async function selectLEDColor(color) {
+  if (!state.connected) return showToast('请先连接设备');
+  state.ledColor = color;
+  updateLEDUI();
+  const rgb = hexToRgb(color);
+  const modeVal = { static:0, cycle:1, bounce:2, multi:3 }[state.ledMode] || 0;
+  await sendCommand(CMD_LED, [
+    state.ledOn ? 1 : 0,
+    modeVal,
+    rgb.r, rgb.g, rgb.b,
+    Math.round(state.ledBrightness * 2.55)
+  ]);
+}
+
+async function updateLEDBrightness(val) {
+  state.ledBrightness = parseInt(val);
+  document.getElementById('ledBrightnessValue').textContent = val + '%';
+  if (state.connected && state.ledOn) {
+    const rgb = hexToRgb(state.ledColor);
+    const modeVal = { static:0, cycle:1, bounce:2, multi:3 }[state.ledMode] || 0;
+    await sendCommand(CMD_LED, [
+      1, modeVal,
+      rgb.r, rgb.g, rgb.b,
+      Math.round(state.ledBrightness * 2.55)
+    ]);
+  }
+}
+
+async function findDevice() {
+  if (!state.connected) return showToast('请先连接设备');
+  showToast('正在查找设备...');
+  await sendCommand(CMD_FIND_DEVICE, [1]);
+  setTimeout(() => showToast('请留意耳机提示音'), 1500);
+}
+
+async function checkUpdate() {
+  showToast('当前已是最新版本');
+}
+
+async function factoryReset() {
+  if (!state.connected) return showToast('请先连接设备');
+  if (confirm('确定要恢复出厂设置吗？这将清除所有自定义设置。')) {
+    showToast('正在恢复出厂设置...');
+    await sendCommand(0x2B, [1]); // Factory reset command
+    setTimeout(() => showToast('恢复出厂设置完成'), 2000);
+  }
+}
+
+// ========== EQ Functions ==========
+function initEQSliders() {
+  const container = document.getElementById('eqSliders');
+  container.innerHTML = '';
+  EQ_BANDS.forEach((band, i) => {
+    const group = document.createElement('div');
+    group.className = 'eq-slider-group';
+    group.innerHTML = `
+      <div class="eq-slider-value" id="eqValue${i}">${state.eqBands[i] >= 0 ? '+' : ''}${state.eqBands[i]}</div>
+      <div class="eq-slider-track">
+        <input type="range" class="eq-slider-input" id="eqSlider${i}"
+          min="-12" max="12" value="${state.eqBands[i]}" step="1"
+          oninput="onEQSliderChange(${i}, this.value)">
+      </div>
+      <div class="eq-slider-label">${band.label}</div>
+    `;
+    container.appendChild(group);
+  });
+}
+
+function onEQSliderChange(index, value) {
+  value = parseInt(value);
+  state.eqBands[index] = value;
+  const valueEl = document.getElementById('eqValue' + index);
+  valueEl.textContent = (value >= 0 ? '+' : '') + value;
+
+  // Switch to custom preset
+  state.eqPreset = 'custom';
+  document.querySelectorAll('.eq-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.eq === 'custom');
+  });
+}
+
+function selectEQPreset(preset) {
+  state.eqPreset = preset;
+  if (preset !== 'custom' && EQ_PRESETS[preset]) {
+    state.eqBands = [...EQ_PRESETS[preset]];
+  }
+  updateEQUI();
+}
+
+function eqQuickAction(action) {
+  switch (action) {
+    case 'reset':
+      state.eqBands = [0,0,0,0,0,0,0,0,0,0];
+      break;
+    case 'bass':
+      state.eqBands = [8,6,4,2,0,0,0,0,0,0];
+      break;
+    case 'vocal':
+      state.eqBands = [-2,-1,0,3,5,5,3,1,0,-1];
+      break;
+    case 'treble':
+      state.eqBands = [0,0,0,0,0,2,4,6,8,8];
+      break;
+  }
+  state.eqPreset = 'custom';
+  updateEQUI();
+}
+
+async function applyEQ() {
+  if (!state.connected) return showToast('请先连接设备');
+  const presetIndex = ['normal','rock','pop','jazz','classic','country'].indexOf(state.eqPreset);
+  const payload = [presetIndex >= 0 ? presetIndex : 6]; // 6 = custom
+  state.eqBands.forEach(val => {
+    payload.push(val < 0 ? val + 256 : val); // Convert to unsigned byte
+  });
+  await sendCommand(CMD_EQ, payload);
+  showToast('均衡器设置已应用');
+}
+
+// ========== Color Grid ==========
+function initColorGrid() {
+  const grid = document.getElementById('colorGrid');
+  grid.innerHTML = '';
+  LED_COLORS.forEach(color => {
+    const item = document.createElement('div');
+    item.className = 'color-item' + (color === state.ledColor ? ' active' : '');
+    item.style.background = color;
+    item.dataset.color = color;
+    item.onclick = () => selectLEDColor(color);
+    grid.appendChild(item);
+  });
+}
+
+// ========== EQ Preset Event Delegation ==========
+document.getElementById('eqPresets').addEventListener('click', (e) => {
+  const btn = e.target.closest('.eq-preset-btn');
+  if (!btn) return;
+  selectEQPreset(btn.dataset.eq);
+});
+
+// ========== Utility ==========
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 255, g: 0, b: 0 };
+}
+</script>
+
+</body>
+</html>
