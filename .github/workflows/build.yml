@@ -30,6 +30,17 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
     
+    - name: Fix Android gitignore for CI
+      run: |
+        cd android
+        # Remove lines that block cap sync in CI
+        sed -i '/^capacitor-cordova-android-plugins$/d' .gitignore
+        sed -i '/^app\/src\/main\/assets\/public$/d' .gitignore
+        sed -i '/^app\/src\/main\/assets\/capacitor.config.json$/d' .gitignore
+        sed -i '/^app\/src\/main\/assets\/capacitor.plugins.json$/d' .gitignore
+        sed -i '/^app\/src\/main\/res\/xml\/config.xml$/d' .gitignore
+        echo "Android .gitignore fixed"
+    
     - name: Sync Capacitor
       run: npx cap sync android
     
