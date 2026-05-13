@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/
+android/.idea/
+*.iml
+*.apk
+*.aab
+
+# iOS
+ios/Pods/
+ios/build/
+*.xcworkspace
+*.xcuserstate
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Capacitor
+www/
+plugins/
+dist/
